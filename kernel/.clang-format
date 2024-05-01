@@ -1,0 +1,8 @@
+BasedOnStyle: Google
+PointerAlignment: Left
+InsertNewlineAtEOF: True
+DerivePointerAlignment: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+ContinuationIndentWidth: 2
+ColumnLimit: 100
