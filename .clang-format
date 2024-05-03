@@ -4,5 +4,6 @@ InsertNewlineAtEOF: True
 DerivePointerAlignment: false
 AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: false
+AlignAfterOpenBracket: BlockIndent
 ContinuationIndentWidth: 2
 ColumnLimit: 100

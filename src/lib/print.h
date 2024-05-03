@@ -5,7 +5,7 @@
 
 #include <source_location>
 
-// I got these off some table on StackOverflow, not sure if the bright colors are correct.
+// I got these off some table on SO, not sure if the bright colors are correct.
 // I also don't exactly use these anywhere, at least not yet.
 // https://stackoverflow.com/a/33206814
 

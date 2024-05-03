@@ -60,9 +60,11 @@ void track_region(physical_addr base, size_t length) {
   region->base = base;
   region->page_count = page_count;
 
-  kprintf("pmem: registering physical region 0x%zx-0x%zx, %zu KiB, %zu pages, %zu KiB for PFDB\n",
-          region->base, region->base + aligned_length, aligned_length / 1024, region->page_count,
-          used / 1024);
+  kprintf(
+    "pmem: registering physical region 0x%zx-0x%zx, %zu KiB, %zu pages, %zu KiB for PFDB\n",
+    region->base, region->base + aligned_length, aligned_length / 1024, region->page_count,
+    used / 1024
+  );
 
   // Initialize the individual page structures
   for (size_t j = 0; j < region->page_count; ++j) {
@@ -121,8 +123,10 @@ physical_addr kernel::alloc_page(page_usage usage) {
   // Make sure the page is actually free, otherwise panic
   // Hopefully that never happens, that would indicate that there's a bug
   // or that the physical memory database was somehow corrupted (bad)
-  kassert_msg(page->usage == kPageUsageFree, "alloc_page: page database corruption: 0x%zx usage %u",
-              page->addr, page->usage);
+  kassert_msg(
+    page->usage == kPageUsageFree, "alloc_page: page database corruption: 0x%zx usage %u",
+    page->addr, page->usage
+  );
 
   // Mark the page as used
   page->usage = usage;
@@ -145,8 +149,10 @@ void kernel::free_page(physical_addr addr) {
   kassert_msg(page != nullptr, "free_page: attempt to free untracked memory at 0x%zx\n", addr);
 
   // Make sure that we are not trying to double-free the page, this is obviously a bug
-  kassert_msg(page->usage != kPageUsageFree,
-              "free_page: attempt to free memory that is already free at 0x%zx\n", addr);
+  kassert_msg(
+    page->usage != kPageUsageFree,
+    "free_page: attempt to free memory that is already free at 0x%zx\n", addr
+  );
 
   // Mark the page as free, dirty, and put it back in the free list
   // In the future we will have a separate list for dirty pages that just got freed
