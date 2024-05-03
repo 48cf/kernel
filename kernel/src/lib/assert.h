@@ -1,6 +1,6 @@
 #pragma once
 
-#include "print.h"
+#include <lib/print.h>
 
 #define kassert(expr)                          \
   do {                                         \
