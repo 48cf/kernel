@@ -21,4 +21,4 @@ clean:
 	rm -rf build
 
 build:
-	@meson setup kernel $@
+	@meson setup $@

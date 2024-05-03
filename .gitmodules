@@ -1,10 +1,10 @@
-[submodule "kernel/vendor/limine"]
-	path = kernel/vendor/limine
+[submodule "vendor/limine"]
+	path = vendor/limine
 	url = https://github.com/limine-bootloader/limine.git
 	branch = v7.x-binary
-[submodule "kernel/vendor/flanterm"]
-	path = kernel/vendor/flanterm
+[submodule "vendor/flanterm"]
+	path = vendor/flanterm
 	url = https://github.com/mintsuki/flanterm.git
-[submodule "kernel/vendor/nanoprintf"]
-	path = kernel/vendor/nanoprintf
+[submodule "vendor/nanoprintf"]
+	path = vendor/nanoprintf
 	url = https://github.com/charlesnicholson/nanoprintf.git

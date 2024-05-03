@@ -2,7 +2,7 @@
 
 cwd="$(pwd -P)"
 build_dir="$cwd/build"
-limine_dir="$cwd/kernel/vendor/limine"
+limine_dir="$cwd/vendor/limine"
 iso_root="$build_dir/platform/amd64/iso_root"
 output_path="$build_dir/platform/amd64/image.iso"
 
