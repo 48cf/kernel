@@ -1,9 +1,11 @@
-#include "phys.h"
-
 #include <lib/list.h>
 #include <lib/misc.h>
 #include <lib/print.h>
+#include <lib/spinlock.h>
 #include <limine.h>
+#include <memory/pmem.h>
+
+#include <cstring>
 
 using namespace kernel;
 
@@ -18,20 +20,14 @@ using namespace kernel;
 namespace {
 
 struct physical_region {
-  // Linkage: physical_regions
-  list_node<physical_region> node;
-  // The base address of the physical region
-  memory::physical_addr base;
-  // The number of pages in the physical region
-  size_t page_count;
-  // The page structures for the physical region
-  memory::page pages[];
+  list_node<physical_region> node;  // Points to physical_regions
+  physical_addr base;               // The base address of the physical region
+  size_t page_count;                // The number of pages in the physical region
+  physical_page pages[];            // The page structures for the physical region (inline)
 };
 
-// Linked list of free pages ready to for allocation
-list<memory::page, &memory::page::node> free_pages;
-
-// Linked list of physical memory regions
+spin_lock allocator_lock;
+list<physical_page, &physical_page::node> free_pages;
 list<physical_region, &physical_region::node> physical_regions;
 
 volatile limine_hhdm_request hhdm_request = {
@@ -46,16 +42,16 @@ volatile limine_memmap_request memmap_request = {
   .response = nullptr,
 };
 
-void add_phys_region(memory::physical_addr base, size_t length) {
+void track_region(physical_addr base, size_t length) {
   size_t page_count = length / PAGE_SIZE;
   size_t aligned_length = page_count * PAGE_SIZE;
-  size_t used = align_up(sizeof(physical_region) + sizeof(memory::page) * page_count, PAGE_SIZE);
+  size_t used = align_up(sizeof(physical_region) + sizeof(physical_page) * page_count, PAGE_SIZE);
 
   // Check if the physical region is big enough to hold the physical region structure
-  // and at least 16 individual pages
+  // and at least 16 individual pages, I don't think it's worth bothering with such
+  // small regions
   if (aligned_length - used < PAGE_SIZE * 16) {
-    kprintf("add_phys_region: skipping physical region 0x%zx-0x%zx, too small\n", base,
-            base + aligned_length);
+    kprintf("pmem: skipping physical region 0x%zx-0x%zx, too small\n", base, base + aligned_length);
     return;
   }
 
@@ -64,11 +60,9 @@ void add_phys_region(memory::physical_addr base, size_t length) {
   region->base = base;
   region->page_count = page_count;
 
-  kprintf(
-    "add_phys_region: registering physical region 0x%zx-0x%zx, %zu KiB, %zu pages, %zu KiB for "
-    "PFDB\n",
-    region->base, region->base + aligned_length, aligned_length / 1024, region->page_count,
-    used / 1024);
+  kprintf("pmem: registering physical region 0x%zx-0x%zx, %zu KiB, %zu pages, %zu KiB for PFDB\n",
+          region->base, region->base + aligned_length, aligned_length / 1024, region->page_count,
+          used / 1024);
 
   // Initialize the individual page structures
   for (size_t j = 0; j < region->page_count; ++j) {
@@ -96,7 +90,7 @@ void add_phys_region(memory::physical_addr base, size_t length) {
 
 }  // namespace
 
-void memory::init_phys_allocator() {
+void kernel::init_phys_allocator() {
   const auto* hhdm_response = hhdm_request.response;
   const auto* memmap_response = memmap_request.response;
 
@@ -110,29 +104,27 @@ void memory::init_phys_allocator() {
     if (entry->type != LIMINE_MEMMAP_USABLE)
       continue;
 
-    add_phys_region(entry->base, entry->length);
+    track_region(entry->base, entry->length);
   }
 }
 
-memory::physical_addr memory::alloc_phys_page(page_usage usage) {
-  // Make sure the requested usage is valid
-  if (usage <= kPageUsageFree || usage >= kPageUsageMax)
-    kpanic("alloc_phys_page: invalid usage %u\n", usage);
+physical_addr kernel::alloc_page(page_usage usage) {
+  kassert(usage > kPageUsageFree && usage < kPageUsageMax);
 
-  // If there are no free pages, return 0
+  lock_guard _(allocator_lock);
+
   if (free_pages.empty())
     return 0;
 
-  // Pop the first free page from the list
   auto* page = free_pages.pop_front();
 
   // Make sure the page is actually free, otherwise panic
   // Hopefully that never happens, that would indicate that there's a bug
   // or that the physical memory database was somehow corrupted (bad)
-  if (page->usage != kPageUsageFree)
-    kpanic("alloc_phys_page: attempt to hand out reversed memory at 0x%zx\n", page->addr);
+  kassert_msg(page->usage == kPageUsageFree, "alloc_page: page database corruption: 0x%zx usage %u",
+              page->addr, page->usage);
 
-  // Mark the page as allocated
+  // Mark the page as used
   page->usage = usage;
 
   // If the page is marked as dirty, zero it out before handing it out
@@ -140,35 +132,32 @@ memory::physical_addr memory::alloc_phys_page(page_usage usage) {
   // to efficiently zero out pages in the background
   if (page->is_dirty) {
     auto* mem8 = static_cast<unsigned char*>(P2V(page->addr));
-
-    for (size_t i = 0; i < PAGE_SIZE; ++i) {
-      mem8[i] = 0;
-    }
+    std::memset(mem8, 0, PAGE_SIZE);
   }
 
   return page->addr;
 }
 
-void memory::free_phys_page(physical_addr addr) {
-  auto* page = physical_to_page(addr);
+void kernel::free_page(physical_addr addr) {
+  auto* page = addr_to_physical_page(addr);
 
   // Make sure that the page comes from a registered physical region
-  if (page == nullptr)
-    kpanic("free_phys_page: attempt to free untracked memory at 0x%zx\n", addr);
+  kassert_msg(page != nullptr, "free_page: attempt to free untracked memory at 0x%zx\n", addr);
 
   // Make sure that we are not trying to double-free the page, this is obviously a bug
-  if (page->usage == kPageUsageFree)
-    kpanic("free_phys_page: attempt to free memory that is already free at 0x%zx\n", addr);
+  kassert_msg(page->usage != kPageUsageFree,
+              "free_page: attempt to free memory that is already free at 0x%zx\n", addr);
 
   // Mark the page as free, dirty, and put it back in the free list
   // In the future we will have a separate list for dirty pages that just got freed
   page->usage = kPageUsageFree;
   page->is_dirty = true;
 
+  lock_guard _(allocator_lock);
   free_pages.push_back(page);
 }
 
-memory::page* memory::physical_to_page(physical_addr addr) {
+physical_page* kernel::addr_to_physical_page(physical_addr addr) {
   for (auto* it = physical_regions.head(); it != nullptr; it = it->node.next) {
     if (addr < it->base || addr >= it->base + it->page_count * PAGE_SIZE)
       continue;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdatomic.h>
+#include <lib/atomic.h>
 
 namespace kernel {
 
@@ -8,7 +8,7 @@ struct spin_lock {
   spin_lock() = default;
 
   inline bool try_lock() {
-    return !locked_.exchange(true, std::memory_order_acquire);
+    return !flag_.exchange(true, kAtomicAcquire);
   }
 
   inline void lock() {
@@ -18,11 +18,11 @@ struct spin_lock {
   }
 
   inline void unlock() {
-    locked_.store(false, std::memory_order_release);
+    flag_.store(false, kAtomicRelease);
   }
 
  private:
-  std::atomic_bool locked_ = false;
+  atomic<bool> flag_ = false;
 };
 
 template <typename T>

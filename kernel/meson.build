@@ -29,7 +29,7 @@ kernel_sources = files(
     'src/main.cpp',
     'src/runtime.cpp',
     'src/lib/print.cpp',
-    'src/memory/phys.cpp',
+    'src/memory/pmem.cpp',
 )
 
 # limine host tool

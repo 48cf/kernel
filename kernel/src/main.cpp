@@ -1,6 +1,6 @@
 #include <lib/print.h>
 #include <limine.h>
-#include <memory/phys.h>
+#include <memory/pmem.h>
 #include <system/cpu.h>
 
 using namespace kernel;
@@ -31,20 +31,20 @@ extern "C" __attribute__((noreturn)) void _start() {
   platform::cpu::init_features();
   platform::cpu::init_bsp();
 
-  memory::init_phys_allocator();
+  init_phys_allocator();
 
   // Perform a silly physical memory allocation test
-  const auto phys1 = memory::alloc_phys_page(kPageUsageConventional);
-  const auto phys2 = memory::alloc_phys_page(kPageUsageConventional);
-  const auto phys3 = memory::alloc_phys_page(kPageUsageConventional);
+  const auto phys1 = alloc_page(kPageUsageConventional);
+  const auto phys2 = alloc_page(kPageUsageConventional);
+  const auto phys3 = alloc_page(kPageUsageConventional);
 
   kprintf("phys1: 0x%zx\n", phys1);
   kprintf("phys2: 0x%zx\n", phys2);
   kprintf("phys3: 0x%zx\n", phys3);
 
-  memory::free_phys_page(phys1);
-  memory::free_phys_page(phys2);
-  memory::free_phys_page(phys3);
+  free_page(phys1);
+  free_page(phys2);
+  free_page(phys3);
 
   kprintf("reached end of _start, halting\n");
 
