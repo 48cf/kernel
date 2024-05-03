@@ -53,7 +53,7 @@ void __attribute__((noreturn)) kernel::kpanic_impl(        //
   va_start(args, format);
   kprintf("panic: ");
   kvprintf(format, args);
-  kprintf("panic: %s in %s:%u\n", location.function_name(), location.file_name(), location.line());
+  kprintf("panic: in %s:%u\n", location.file_name(), location.line());
   va_end(args);
 
   asm volatile("cli");
