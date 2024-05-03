@@ -1,11 +1,6 @@
 #pragma once
 
 #include <type_traits>
-#include <utility>
-
-#define constexpr_assert(cond)                   \
-  if (std::__is_constant_evaluated() && !(cond)) \
-    std::unreachable();
 
 namespace kernel {
 
@@ -28,15 +23,10 @@ struct atomic {
   }
 
   void store(T value, memory_ordering order = kAtomicSeqCst) {
-    constexpr_assert(order != kAtomicAcquire);
-    constexpr_assert(order != kAtomicAcqRel);
-    constexpr_assert(order != kAtomicConsume);
     __atomic_store_n(&value_, value, static_cast<int>(order));
   }
 
   T load(memory_ordering order = kAtomicSeqCst) const {
-    constexpr_assert(order != kAtomicRelease);
-    constexpr_assert(order != kAtomicAcqRel);
     return __atomic_load_n(&value_, static_cast<int>(order));
   }
 
